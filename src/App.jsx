@@ -159,11 +159,12 @@ function AuthScreen({ onAuth }) {
     setError(""); setLoading(true);
     try {
       const hash = await hashPassword(form.password);
-      const { data, error:e } = await sb.from("users").select("*").eq("email", form.email.toLowerCase()).eq("password_hash", hash).single();
-      if (e || !data) { setError(t.invalidLogin); setLoading(false); return; }
-      if (data.approved === false) { setError(t.suspendedMsg); setLoading(false); return; }
-      onAuth(data);
-    } catch { setError(t.loginFailed); setLoading(false); }
+      const { data, error:e } = await sb.from("users").select("*").eq("email", form.email.toLowerCase().trim()).eq("password_hash", hash);
+      if (e || !data || data.length === 0) { setError(t.invalidLogin); setLoading(false); return; }
+      const user = data[0];
+      if (user.approved === false) { setError(t.suspendedMsg); setLoading(false); return; }
+      onAuth(user);
+    } catch(err) { setError(t.loginFailed); setLoading(false); }
   }
 
   async function handleRegister() {
