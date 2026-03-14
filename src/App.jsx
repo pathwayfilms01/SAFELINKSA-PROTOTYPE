@@ -4,7 +4,7 @@ import LOGO_URI from "./safelink_logo.jpeg";
 
 // ── Supabase ─────────────────────────────────────────────────────
 const SUPABASE_URL = "https://jnhuawinagsjznuwdnft.supabase.co";
-const SUPABASE_KEY = "sb_publishable_mOzgbag3biuDonPPnK0Kaw_zJV_v_Y7";
+const SUPABASE_KEY = "sb_publishable_Z2THAKF6AKAw8cWqwED1uA_JDhHXEDH";
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Brand ────────────────────────────────────────────────────────
