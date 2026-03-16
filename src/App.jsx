@@ -131,18 +131,74 @@ function useLang() { return t; }
 
 // ── Top Bar ───────────────────────────────────────────────────────
 function TopBar({ user, onLogout, t }) {
+  const [showPwModal, setShowPwModal] = useState(false);
+  const [pwForm, setPwForm] = useState({ current:"", newPw:"", confirm:"" });
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
+
+  async function handleChangePassword() {
+    setPwError(""); setPwSuccess(false);
+    if (!pwForm.current || !pwForm.newPw || !pwForm.confirm) { setPwError("Please fill in all fields."); return; }
+    if (pwForm.newPw !== pwForm.confirm) { setPwError("New passwords do not match."); return; }
+    if (pwForm.newPw.length < 6) { setPwError("Password must be at least 6 characters."); return; }
+    setPwLoading(true);
+    try {
+      const currentHash = await hashPassword(pwForm.current);
+      const { data } = await sb.from("users").select("id").eq("id", user.id).eq("password_hash", currentHash);
+      if (!data || data.length === 0) { setPwError("Current password is incorrect."); setPwLoading(false); return; }
+      const newHash = await hashPassword(pwForm.newPw);
+      await sb.from("users").update({ password_hash: newHash }).eq("id", user.id);
+      setPwSuccess(true); setPwLoading(false);
+      setPwForm({ current:"", newPw:"", confirm:"" });
+      setTimeout(() => { setShowPwModal(false); setPwSuccess(false); }, 2000);
+    } catch(e) { setPwError("Something went wrong. Try again."); setPwLoading(false); }
+  }
+
   return (
-    <div style={{ padding:"14px 16px 10px", background:C.black, borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-      <img src={LOGO_URI} alt="SafeLink SA" style={{ height:28, objectFit:"contain" }} />
-      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-        
-        <div style={{ textAlign:"right" }}>
-          <div style={{ fontSize:11, color:C.grey }}>{user?.role?.replace("_"," ").toUpperCase()}</div>
-          <div style={{ fontSize:12, color:C.white, fontWeight:600 }}>{user?.full_name?.split(" ")[0]}</div>
+    <>
+      <div style={{ padding:"14px 16px 10px", background:C.black, borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <img src={LOGO_URI} alt="SafeLink SA" style={{ height:28, objectFit:"contain" }} />
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <div style={{ textAlign:"right", cursor:"pointer" }} onClick={() => setShowPwModal(true)}>
+            <div style={{ fontSize:11, color:C.grey }}>{user?.role?.replace("_"," ").toUpperCase()}</div>
+            <div style={{ fontSize:12, color:C.white, fontWeight:600 }}>{user?.full_name?.split(" ")[0]} <span style={{ fontSize:10, color:C.red }}>✎</span></div>
+          </div>
+          <button className="btn btn-dark" style={{ padding:"6px 10px", fontSize:11 }} onClick={onLogout}>{t.logout}</button>
         </div>
-        <button className="btn btn-dark" style={{ padding:"6px 10px", fontSize:11 }} onClick={onLogout}>{t.logout}</button>
       </div>
-    </div>
+      {showPwModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:20, padding:24, width:"100%", maxWidth:340 }}>
+            <div style={{ fontFamily:"Bebas Neue", fontSize:22, color:C.white, marginBottom:4 }}>CHANGE PASSWORD</div>
+            <div style={{ fontSize:12, color:C.grey, marginBottom:20 }}>Tap your name anytime to update your password</div>
+            {pwSuccess ? (
+              <div style={{ background:C.greenBg, border:`1px solid ${C.green}`, borderRadius:12, padding:16, textAlign:"center", color:C.green, fontWeight:600 }}>✅ Password updated successfully!</div>
+            ) : (
+              <>
+                {pwError && <div style={{ background:"rgba(208,2,27,0.1)", border:`1px solid ${C.red}`, borderRadius:10, padding:12, fontSize:13, color:C.red, marginBottom:12 }}>{pwError}</div>}
+                <div style={{ marginBottom:12 }}>
+                  <div style={{ fontSize:12, color:C.grey, marginBottom:6 }}>Current Password</div>
+                  <input className="input" type="password" placeholder="Enter current password" value={pwForm.current} onChange={e => setPwForm(f => ({...f, current:e.target.value}))} />
+                </div>
+                <div style={{ marginBottom:12 }}>
+                  <div style={{ fontSize:12, color:C.grey, marginBottom:6 }}>New Password</div>
+                  <input className="input" type="password" placeholder="Enter new password" value={pwForm.newPw} onChange={e => setPwForm(f => ({...f, newPw:e.target.value}))} />
+                </div>
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:12, color:C.grey, marginBottom:6 }}>Confirm New Password</div>
+                  <input className="input" type="password" placeholder="Confirm new password" value={pwForm.confirm} onChange={e => setPwForm(f => ({...f, confirm:e.target.value}))} />
+                </div>
+                <div style={{ display:"flex", gap:10 }}>
+                  <button className="btn btn-dark" style={{ flex:1, padding:12, fontSize:13 }} onClick={() => { setShowPwModal(false); setPwError(""); setPwForm({ current:"", newPw:"", confirm:"" }); }}>Cancel</button>
+                  <button className="btn btn-red" style={{ flex:2, padding:12, fontSize:13 }} onClick={handleChangePassword} disabled={pwLoading}>{pwLoading ? "Saving..." : "Update Password"}</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
