@@ -826,10 +826,20 @@ function MatchResult({ result, onDone, onShowWhatsApp, t }) {
                   <div style={{ fontSize:12, color:C.white, fontWeight:600 }}>{result.shelter.intake_hours}</div>
                 </div>
               </div>
-              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:12 }}>
                 <div style={{ fontSize:12, color:C.greyLight }}>📞 {result.shelter.primary_contact}</div>
-                <div style={{ fontSize:12, color:C.greyLight }}>💬 {result.shelter.whatsapp}</div>
                 <div style={{ fontSize:12, color:C.greyLight }}>🌙 {result.shelter.after_hours}</div>
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                <a href={"https://wa.me/"+((result.shelter.whatsapp||"").replace(/D/g,""))+"?text=Hi%2C%20this%20is%20a%20SafeLink%20SA%20referral.%20Case%20ID%3A%20"+result.caseId+".%20I%20have%20a%20survivor%20who%20needs%20placement.%20Are%20you%20able%20to%20assist%3F"}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:10, padding:"13px", background:"#25D366", borderRadius:12, color:"#fff", fontWeight:700, fontSize:14, textDecoration:"none" }}>
+                  💬 Message Shelter on WhatsApp
+                </a>
+                <a href={"tel:"+result.shelter.primary_contact}
+                  style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:10, padding:"13px", background:C.blackSoft, borderRadius:12, color:C.white, fontWeight:600, fontSize:13, textDecoration:"none", border:"1px solid "+C.border }}>
+                  📞 Call Shelter Coordinator
+                </a>
               </div>
             </div>
           )}
@@ -998,6 +1008,11 @@ function ShelterDashboard({ user, onLogout }) {
   const [cases, setCases] = useState([]);
   const [saving, setSaving] = useState(false);
   const [screen, setScreen] = useState("home");
+  const [editDesc, setEditDesc] = useState(false);
+  const [descText, setDescText] = useState("");
+  const [intakeText, setIntakeText] = useState("");
+  const [showIntake, setShowIntake] = useState(false);
+  const [pendingReferral, setPendingReferral] = useState(null);
 
   useEffect(() => { loadShelter(); loadCases(); }, []);
 
@@ -1030,10 +1045,46 @@ function ShelterDashboard({ user, onLogout }) {
       <TopBar user={user} onLogout={onLogout} t={t} />
       <div className="screen fade-in" style={{ padding:"16px 16px 100px" }}>
         {shelter ? (<>
-          <div style={{ background:`linear-gradient(135deg,#1A0000,#2A0008)`, border:`1px solid ${C.border}`, borderRadius:20, padding:"18px 20px", marginBottom:16 }}>
+          <div style={{ background:"linear-gradient(135deg,#1A0000,#2A0008)", border:"1px solid "+C.border, borderRadius:20, padding:"18px 20px", marginBottom:16 }}>
             <div style={{ fontSize:11, color:C.grey, marginBottom:3 }}>{t.yourShelter}</div>
             <div style={{ fontFamily:"Bebas Neue", fontSize:20, color:C.white, letterSpacing:1 }}>{shelter.shelter_name}</div>
-            <div style={{ fontSize:12, color:C.grey }}>{shelter.area}</div>
+            <div style={{ fontSize:12, color:C.grey, marginBottom:10 }}>{shelter.area}</div>
+            {editDesc ? (
+              <div>
+                <textarea value={descText} onChange={e=>setDescText(e.target.value)} placeholder="Write a short description of your shelter..."
+                  style={{ width:"100%", minHeight:80, background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:10, color:"#fff", fontSize:12, padding:"10px 12px", fontFamily:"DM Sans", resize:"none", outline:"none" }} />
+                <div style={{ marginTop:8 }}>
+                  <div style={{ fontSize:11, color:"rgba(255,255,255,0.6)", marginBottom:6 }}>Show intake process publicly?</div>
+                  <div style={{ display:"flex", gap:8 }}>
+                    {[{v:true,l:"Yes — show"},{v:false,l:"Keep private"}].map(o => (
+                      <button key={String(o.v)} onClick={() => setShowIntake(o.v)}
+                        style={{ flex:1, padding:"8px 6px", fontSize:11, background:showIntake===o.v?"rgba(208,2,27,0.3)":"rgba(255,255,255,0.08)", color:showIntake===o.v?"#fff":"rgba(255,255,255,0.5)", border:"1px solid "+(showIntake===o.v?C.red:"rgba(255,255,255,0.15)"), borderRadius:8, cursor:"pointer" }}>{o.l}</button>
+                    ))}
+                  </div>
+                </div>
+                {showIntake && (
+                  <textarea value={intakeText} onChange={e=>setIntakeText(e.target.value)} placeholder="Describe your intake process..."
+                    style={{ width:"100%", minHeight:70, background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.2)", borderRadius:10, color:"#fff", fontSize:12, padding:"10px 12px", fontFamily:"DM Sans", resize:"none", outline:"none", marginTop:8 }} />
+                )}
+                <div style={{ display:"flex", gap:8, marginTop:10 }}>
+                  <button onClick={() => setEditDesc(false)} style={{ flex:1, padding:"9px", fontSize:12, background:"rgba(255,255,255,0.08)", color:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.15)", borderRadius:8, cursor:"pointer" }}>Cancel</button>
+                  <button onClick={async () => { await sb.from("shelters").update({ description:descText, show_intake:showIntake, intake_process:intakeText }).eq("id",shelter.id); setShelter(s=>({...s,description:descText,show_intake:showIntake,intake_process:intakeText})); setEditDesc(false); }}
+                    style={{ flex:2, padding:"9px", fontSize:12, background:C.red, color:"#fff", border:"none", borderRadius:8, cursor:"pointer", fontWeight:600 }}>Save</button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                {shelter.description ? <div style={{ fontSize:12, color:"rgba(255,255,255,0.7)", lineHeight:1.6, marginBottom:8 }}>{shelter.description}</div> : <div style={{ fontSize:12, color:"rgba(255,255,255,0.35)", fontStyle:"italic", marginBottom:8 }}>No description yet</div>}
+                {shelter.show_intake && shelter.intake_process && (
+                  <div style={{ background:"rgba(255,255,255,0.06)", borderRadius:8, padding:"8px 10px", marginBottom:8 }}>
+                    <div style={{ fontSize:10, color:C.amber, fontWeight:600, marginBottom:4 }}>INTAKE PROCESS</div>
+                    <div style={{ fontSize:11, color:"rgba(255,255,255,0.7)", lineHeight:1.6 }}>{shelter.intake_process}</div>
+                  </div>
+                )}
+                <button onClick={() => { setDescText(shelter.description||""); setIntakeText(shelter.intake_process||""); setShowIntake(shelter.show_intake||false); setEditDesc(true); }}
+                  style={{ padding:"7px 14px", fontSize:11, background:"rgba(255,255,255,0.1)", color:"rgba(255,255,255,0.7)", border:"1px solid rgba(255,255,255,0.15)", borderRadius:8, cursor:"pointer" }}>✎ Edit Description</button>
+              </div>
+            )}
           </div>
           <div className="card" style={{ marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <div>
@@ -1066,6 +1117,47 @@ function ShelterDashboard({ user, onLogout }) {
           </div>
           <div>
             <div style={{ fontSize:12, color:C.grey, fontWeight:600, marginBottom:10 }}>{t.recentReferrals}</div>
+            {cases.filter(c=>c.matched_shelter===shelter.shelter_name).length > 0 && (
+              <div style={{ background:"rgba(208,2,27,0.08)", border:"1px solid "+C.red, borderRadius:14, padding:"14px 16px", marginBottom:12 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+                  <div className="pulse" style={{ width:8, height:8, borderRadius:"50%", background:C.red }} />
+                  <div style={{ fontSize:12, color:C.red, fontWeight:700 }}>NEW REFERRAL INCOMING</div>
+                </div>
+                {(() => { const c = cases.filter(x=>x.matched_shelter===shelter.shelter_name)[0]; return (
+                  <div>
+                    <div style={{ fontFamily:"DM Mono", fontSize:12, color:C.white, marginBottom:8 }}>{c.case_id}</div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:10 }}>
+                      {[{l:"Case Type",v:c.case_type},{l:"Gender",v:c.survivor_gender},{l:"Risk Level",v:c.safety_risk},{l:"Location",v:c.location_area}].map(({l,v}) => (
+                        <div key={l} style={{ background:C.blackSoft, borderRadius:8, padding:"7px 10px" }}>
+                          <div style={{ fontSize:10, color:C.grey }}>{l}</div>
+                          <div style={{ fontSize:12, color:C.white, fontWeight:600 }}>{v||"—"}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {c.has_children && <div style={{ fontSize:11, color:C.amber, marginBottom:8 }}>👶 Has {c.num_children} child(ren)</div>}
+                    <div style={{ fontSize:10, color:"rgba(255,255,255,0.4)", marginBottom:10 }}>⚠ No personal details — POPIA compliant</div>
+                    {pendingReferral===c.id ? (
+                      <div style={{ background:C.greenBg, border:"1px solid "+C.green, borderRadius:10, padding:"12px", textAlign:"center" }}>
+                        <div style={{ fontSize:14, color:C.green, fontWeight:700 }}>✅ Confirmed!</div>
+                        <div style={{ fontSize:11, color:C.green, marginTop:4 }}>VFR officer notified. Please prepare for arrival.</div>
+                      </div>
+                    ) : pendingReferral==="declined_"+c.id ? (
+                      <div style={{ background:"rgba(208,2,27,0.1)", border:"1px solid "+C.red, borderRadius:10, padding:"12px", textAlign:"center" }}>
+                        <div style={{ fontSize:13, color:C.red, fontWeight:600 }}>Referral Declined</div>
+                        <div style={{ fontSize:11, color:C.grey, marginTop:4 }}>VFR officer will find an alternative placement.</div>
+                      </div>
+                    ) : (
+                      <div style={{ display:"flex", gap:8 }}>
+                        <button onClick={() => setPendingReferral(c.id)}
+                          style={{ flex:2, padding:"12px", background:C.green, color:"#fff", border:"none", borderRadius:10, fontWeight:700, fontSize:13, cursor:"pointer" }}>✓ Confirm — We Can Help</button>
+                        <button onClick={() => setPendingReferral("declined_"+c.id)}
+                          style={{ flex:1, padding:"12px", background:"transparent", color:C.red, border:"1.5px solid "+C.red, borderRadius:10, fontWeight:600, fontSize:12, cursor:"pointer" }}>✗ Decline</button>
+                      </div>
+                    )}
+                  </div>
+                ); })()}
+              </div>
+            )}
             {cases.filter(c=>c.matched_shelter===shelter.shelter_name).slice(0,3).map(c => (
               <div key={c.id} className="card" style={{ marginBottom:8 }}>
                 <div style={{ fontFamily:"DM Mono", fontSize:12, color:C.white }}>{c.case_id}</div>
@@ -1222,12 +1314,75 @@ function AdminUsers({ users:initialUsers, onBack, t }) {
 }
 
 // ── Admin Dashboard ───────────────────────────────────────────────
+
+// ── Admin Referral Proxy ──────────────────────────────────────────────
+function AdminReferralProxy({ user, shelters, onBack, t }) {
+  const [vfrName, setVfrName] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [matchResult, setMatchResult] = useState(null);
+
+  if (matchResult) {
+    return (
+      <div style={{ display:"flex", flexDirection:"column", height:"100%" }}>
+        <div style={{ padding:"14px 16px", background:C.black, borderBottom:"1px solid "+C.border, display:"flex", alignItems:"center", gap:12 }}>
+          <button className="btn btn-dark" style={{ padding:"8px 12px", fontSize:13 }} onClick={onBack}>Back</button>
+          <div style={{ fontFamily:"Bebas Neue", fontSize:18, color:C.white }}>REFERRAL SUBMITTED</div>
+        </div>
+        <div className="screen fade-in" style={{ padding:"20px" }}>
+          <div style={{ background:C.greenBg, border:"1px solid "+C.green, borderRadius:16, padding:"20px", marginBottom:16, textAlign:"center" }}>
+            <div style={{ fontSize:32, marginBottom:8 }}>✅</div>
+            <div style={{ fontFamily:"Bebas Neue", fontSize:22, color:C.green }}>MATCH FOUND</div>
+            <div style={{ fontSize:12, color:C.grey, marginTop:4 }}>Submitted on behalf of: {vfrName||"VFR Officer"}</div>
+          </div>
+          {matchResult.shelter && (
+            <div className="card" style={{ border:"1px solid "+C.green, marginBottom:12 }}>
+              <div style={{ fontSize:10, color:C.green, fontWeight:600, marginBottom:8 }}>MATCHED SHELTER</div>
+              <div style={{ fontSize:17, color:C.white, fontWeight:700, marginBottom:4 }}>{matchResult.shelter.shelter_name}</div>
+              <div style={{ fontSize:12, color:C.grey, marginBottom:12 }}>{matchResult.shelter.area}</div>
+              <a href={"https://wa.me/"+((matchResult.shelter.whatsapp||"").replace(/\D/g,""))+"?text=Hi%2C%20SafeLink%20SA%20Admin%20referral%20on%20behalf%20of%20"+encodeURIComponent(vfrName||"VFR Officer")+".%20Case%3A%20"+matchResult.caseId+".%20Please%20confirm%20availability."}
+                target="_blank" rel="noopener noreferrer"
+                style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"12px", background:"#25D366", borderRadius:10, color:"#fff", fontWeight:700, fontSize:13, textDecoration:"none" }}>
+                💬 Message Shelter on WhatsApp
+              </a>
+            </div>
+          )}
+          <button className="btn btn-dark" style={{ width:"100%", padding:"13px" }} onClick={onBack}>Return to Admin Dashboard</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (showForm) {
+    return <ReferralForm user={{...user, full_name: vfrName||user.full_name}} shelters={shelters} onBack={() => setShowForm(false)} onMatch={r => setMatchResult(r)} t={t} />;
+  }
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:"100%" }}>
+      <div style={{ padding:"14px 16px", background:C.black, borderBottom:"1px solid "+C.border, display:"flex", alignItems:"center", gap:12 }}>
+        <button className="btn btn-dark" style={{ padding:"8px 12px", fontSize:13 }} onClick={onBack}>Back</button>
+        <div style={{ fontFamily:"Bebas Neue", fontSize:18, color:C.white }}>SUBMIT ON BEHALF OF VFR</div>
+      </div>
+      <div className="screen fade-in" style={{ padding:"16px" }}>
+        <div className="card" style={{ marginBottom:16, border:"1px solid "+C.blue }}>
+          <div style={{ fontSize:11, color:C.blue, fontWeight:600, marginBottom:8 }}>👮 VFR OFFICER DETAILS</div>
+          <div style={{ fontSize:12, color:C.grey, marginBottom:10 }}>Who are you submitting this referral on behalf of?</div>
+          <input className="input" placeholder="VFR Officer or Social Worker name" value={vfrName} onChange={e=>setVfrName(e.target.value)} style={{ marginBottom:14 }} />
+          <button className="btn btn-red" style={{ width:"100%", padding:"13px", fontSize:13 }} onClick={() => setShowForm(true)}>
+            Continue to Referral Form →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminDashboard({ user, onLogout }) {
   const t = useLang();
   const [users, setUsers] = useState([]);
   const [cases, setCases] = useState([]);
   const [shelters, setShelters] = useState([]);
   const [screen, setScreen] = useState("home");
+  const [showAdminReferral, setShowAdminReferral] = useState(false);
 
   const loadAll = useCallback(async () => {
     const [u,c,s] = await Promise.all([
@@ -1252,6 +1407,7 @@ function AdminDashboard({ user, onLogout }) {
   if (screen==="shelters") return <ShelterProfiles shelters={shelters} onBack={() => setScreen("home")} t={t} />;
   if (screen==="map") return <ShelterMap shelters={shelters} onBack={() => setScreen("home")} t={t} />;
   if (screen==="report") return <MonthlyReport cases={cases} shelters={shelters} users={users} onBack={() => setScreen("home")} t={t} />;
+  if (showAdminReferral) return <AdminReferralProxy user={user} shelters={shelters} onBack={() => setShowAdminReferral(false)} t={t} />;
 
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"100%" }}>
@@ -1275,6 +1431,9 @@ function AdminDashboard({ user, onLogout }) {
         </div>
 
         {/* Quick actions */}
+        <button className="btn btn-red" style={{ width:"100%", padding:"13px", fontSize:13, marginBottom:10, borderRadius:14, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }} onClick={() => setShowAdminReferral(true)}>
+          <span style={{ fontSize:18 }}>{"➕"}</span> Submit Referral on Behalf of VFR
+        </button>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16 }}>
           {[{icon:"👥",label:"Manage Users",s:"users",color:C.blue},{icon:"🗺",label:t.map,s:"map",color:C.green},{icon:"🏠",label:"Shelter Profiles",s:"shelters",color:C.amber},{icon:"📊",label:t.monthlyReport,s:"report",color:C.purple}].map(a => (
             <button key={a.s} className="btn" onClick={() => setScreen(a.s)}
