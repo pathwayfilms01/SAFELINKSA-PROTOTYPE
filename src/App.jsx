@@ -879,7 +879,7 @@ function CaseLog({ cases, onBack, onSelectCase, t }) {
             <div key={c.id} className="card fade-in" style={{ marginBottom:10, cursor:"pointer" }} onClick={() => onSelectCase(c)}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
                 <div style={{ fontFamily:"DM Mono", fontSize:12, color:C.white }}>{c.case_id}</div>
-                <span className="tag" style={{ background:c.outcome==="MATCHED"?C.greenBg:C.amberBg, color:c.outcome==="MATCHED"?C.green:C.amber, fontSize:10 }}>{c.outcome||"PENDING"}</span>
+                <span className="tag" style={{ background:c.status==="CONFIRMED"?"rgba(0,200,83,0.2)":c.outcome==="MATCHED"?C.greenBg:C.amberBg, color:c.status==="CONFIRMED"?C.green:c.outcome==="MATCHED"?C.green:C.amber, fontSize:10 }}>{c.status==="CONFIRMED"?"CONFIRMED ✓":c.outcome||"PENDING"}</span>
               </div>
               <div style={{ fontSize:11, color:C.grey }}>{c.case_type} · {c.survivor_gender} · Risk: {c.safety_risk}</div>
               {c.matched_shelter && <div style={{ fontSize:11, color:C.green, marginTop:3 }}>→ {c.matched_shelter}</div>}
@@ -902,7 +902,12 @@ function ReferralDashboard({ user, onLogout }) {
   const [selectedCase, setSelectedCase] = useState(null);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   
-  useEffect(() => { loadCases(); loadShelters(); }, []);
+  useEffect(() => { 
+    loadCases(); 
+    loadShelters(); 
+    const interval = setInterval(loadCases, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function loadCases() {
     const { data } = await sb.from("cases").select("*").eq("submitted_by",user.id).order("created_at",{ascending:false});
@@ -945,6 +950,25 @@ function ReferralDashboard({ user, onLogout }) {
 
         
 
+        {cases.filter(c=>c.status==="CONFIRMED").length > 0 && (
+          <div style={{ background:C.greenBg, border:"1px solid "+C.green, borderRadius:14, padding:"14px 16px", marginBottom:14 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+              <div className="pulse" style={{ width:8, height:8, borderRadius:"50%", background:C.green }} />
+              <div style={{ fontSize:12, color:C.green, fontWeight:700 }}>SHELTER CONFIRMED — READY TO RECEIVE</div>
+            </div>
+            {cases.filter(c=>c.status==="CONFIRMED").slice(0,2).map(c => (
+              <div key={c.id} style={{ background:"rgba(0,200,83,0.08)", borderRadius:10, padding:"10px 12px", marginBottom:6 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                  <div style={{ fontFamily:"DM Mono", fontSize:12, color:C.white }}>{c.case_id}</div>
+                  <span style={{ fontSize:10, fontWeight:700, color:C.green, background:"rgba(0,200,83,0.15)", padding:"3px 8px", borderRadius:20 }}>CONFIRMED ✓</span>
+                </div>
+                <div style={{ fontSize:12, color:C.white, fontWeight:600, marginBottom:2 }}>{c.matched_shelter}</div>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.6)" }}>{c.case_type} · {c.location_area}</div>
+                <div style={{ fontSize:11, color:C.green, marginTop:6, fontWeight:600 }}>✅ Shelter is ready — proceed with placement</div>
+              </div>
+            ))}
+          </div>
+        )}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:16 }}>
           {[{label:t.totalCases,value:cases.length,color:C.white},{label:t.matched,value:matchedCount,color:C.green},{label:t.open,value:openCount,color:C.amber}].map(s => (
             <div key={s.label} className="card" style={{ textAlign:"center", padding:"12px 6px" }}>
@@ -1148,7 +1172,10 @@ function ShelterDashboard({ user, onLogout }) {
                       </div>
                     ) : (
                       <div style={{ display:"flex", gap:8 }}>
-                        <button onClick={() => setPendingReferral(c.id)}
+                        <button onClick={async () => { 
+                          setPendingReferral(c.id); 
+                          await sb.from("cases").update({ status:"CONFIRMED", outcome:"CONFIRMED" }).eq("id",c.id); 
+                        }}
                           style={{ flex:2, padding:"12px", background:C.green, color:"#fff", border:"none", borderRadius:10, fontWeight:700, fontSize:13, cursor:"pointer" }}>✓ Confirm — We Can Help</button>
                         <button onClick={() => setPendingReferral("declined_"+c.id)}
                           style={{ flex:1, padding:"12px", background:"transparent", color:C.red, border:"1.5px solid "+C.red, borderRadius:10, fontWeight:600, fontSize:12, cursor:"pointer" }}>✗ Decline</button>
